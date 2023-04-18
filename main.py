@@ -1,13 +1,22 @@
 #модуль для открытия вебэстраницы
-import weather
 import webbrowser
-import telebot
 import sqlite3
+import telebot
 import config
+import requests
+import json
+from translations import WEATHER_TRANSLATIONS
+from currency_converter import CurrencyConverter
 from telebot import types
+
+
+
 
 #Api для подключения бота
 bot = telebot.TeleBot(config.TOKEN)
+opi = config.OPI
+amout = 0
+
 
 #декоратор для команды start
 @bot.message_handler(commands=['start'])
@@ -54,11 +63,6 @@ def get_users(message):
         users_list += f"{row[0]} - {row[1]}\n"
     bot.send_message(message.chat.id, users_list)
 
-@bot.message_handler(commands=['weather'])
-def get_weather(message):
-    weather.weather(message)
-
-
 #обработчик команды перехода на github
 @bot.message_handler(commands=['github'])
 def github(message):
@@ -68,6 +72,49 @@ def github(message):
 def site(message):
     webbrowser.open('https://www.gilmanov.net/')
 
+@bot.message_handler(commands=['converter'])
+def converter(message):
+    bot.send_message(message.chat.id, 'Введите сумму')
+    bot.register_next_step_handler(message, summa)
+
+def summa(message):
+    try:
+        global amout
+        amout = int(message.text.strip())
+
+        if amout <= 0:
+            raise ValueError("Сумма должна быть положительным числом")
+
+        mark = types.InlineKeyboardMarkup(row_width=2)
+        btn1 = types.InlineKeyboardButton('RUB/EUR', callback_data='rub/eur')
+        btn2 = types.InlineKeyboardButton('RUB/USD', callback_data='rub/usd')
+        btn3 = types.InlineKeyboardButton('RUB/TL', callback_data='rub/tl')
+        mark.add(btn1, btn2, btn3)
+        bot.send_message(message.chat.id, 'Выберите пару валют', reply_markup=mark)
+
+    except ValueError:
+        bot.send_message(message.chat.id, "Ошибка: введенное значение не является положительным числом.")
+    except Exception as e:
+        bot.send_message(message.chat.id, "Произошла ошибка: {}".format(str(e)))
+
+
+@bot.message_handler(commands=['weather'])
+def weather(message):
+    bot.send_message(message.chat.id, 'Напишите название города')
+    bot.register_next_step_handler(message, get_weather)
+
+def get_weather(message):
+    city = message.text.strip().lower()
+    res = requests.get(f'https://api.openweathermap.org/data/2.5/weather?q={city}&appid={opi}&units=metric')
+    if res.status_code == 200:
+        data = json.loads(res.text)
+        temp = data['main']['temp']
+        description = data['weather'][0]['description']
+        translated_description = WEATHER_TRANSLATIONS.get(description, description)
+        message_text = f'Сейчас погода в городе {city.capitalize()}:\n\n{translated_description}, температура {temp:.1f}°C'
+        bot.reply_to(message, message_text)
+    else:
+        bot.reply_to(message, 'Не удалось получить данные о погоде для данного города')
 
 
 @bot.message_handler(commands=['help'])
@@ -94,5 +141,4 @@ def info(message):
 
 
 
-#чтобы бот работал постоянно
-bot.polling(non_stop=True)
+bot.polling(none_stop=True)
