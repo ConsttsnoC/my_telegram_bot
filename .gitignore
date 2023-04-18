@@ -8,6 +8,7 @@ telenv/
 *.pyo
 *.pyd
 *.pyc
+config.py
 
 # Distribution / packaging
 *.egg-info/
