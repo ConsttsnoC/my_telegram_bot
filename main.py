@@ -1,5 +1,5 @@
 #модуль для открытия вебэстраницы
-import time
+import weather
 import webbrowser
 import telebot
 import sqlite3
@@ -54,6 +54,11 @@ def get_users(message):
         users_list += f"{row[0]} - {row[1]}\n"
     bot.send_message(message.chat.id, users_list)
 
+@bot.message_handler(commands=['weather'])
+def get_weather(message):
+    weather.weather(message)
+
+
 #обработчик команды перехода на github
 @bot.message_handler(commands=['github'])
 def github(message):
@@ -85,6 +90,9 @@ def info(message):
     elif message.text.lower() == 'id':
             #ответ на предыдущее сообщение
         bot.reply_to(message, f'ID: {message.from_user.id}')
+
+
+
 
 #чтобы бот работал постоянно
 bot.polling(non_stop=True)
