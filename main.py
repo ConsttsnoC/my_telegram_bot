@@ -6,16 +6,13 @@ import config
 import requests
 import json
 from translations import WEATHER_TRANSLATIONS
-from currency_converter import CurrencyConverter
 from telebot import types
 
-
-
-
+amount = 0
 #Api для подключения бота
 bot = telebot.TeleBot(config.TOKEN)
 opi = config.OPI
-amout = 0
+api = config.API_KEY
 
 
 #декоратор для команды start
@@ -78,24 +75,46 @@ def converter(message):
     bot.register_next_step_handler(message, summa)
 
 def summa(message):
+    global amount
     try:
-        global amout
-        amout = int(message.text.strip())
+        amount = int(message.text.strip())
 
-        if amout <= 0:
+        if amount <= 0:
             raise ValueError("Сумма должна быть положительным числом")
 
+        bot.send_message(message.chat.id, f"Вы указали сумму {amount} рублей. Теперь выберите пару валют:")
+
         mark = types.InlineKeyboardMarkup(row_width=2)
-        btn1 = types.InlineKeyboardButton('RUB/EUR', callback_data='rub/eur')
-        btn2 = types.InlineKeyboardButton('RUB/USD', callback_data='rub/usd')
-        btn3 = types.InlineKeyboardButton('RUB/TL', callback_data='rub/tl')
-        mark.add(btn1, btn2, btn3)
+        btn1 = types.InlineKeyboardButton('RUB/TL', callback_data='TRY')
+        btn2 = types.InlineKeyboardButton('RUB/USD', callback_data='USD')
+        btn3 = types.InlineKeyboardButton('RUB/EUR', callback_data='EUR')
+
+        mark.add(btn1,btn2,btn3)
         bot.send_message(message.chat.id, 'Выберите пару валют', reply_markup=mark)
 
     except ValueError:
         bot.send_message(message.chat.id, "Ошибка: введенное значение не является положительным числом.")
     except Exception as e:
         bot.send_message(message.chat.id, "Произошла ошибка: {}".format(str(e)))
+
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_handler(call):
+    try:
+        # получаем значение валюты из callback_data
+        currency = call.data
+
+        api_url = f"https://api.apilayer.com/exchangerates_data/convert?from=RUB&to={currency}&amount={amount}&apikey={api}"
+        response = requests.get(api_url)
+        result = response.json()['result']
+        bot.answer_callback_query(callback_query_id=call.id, text=f"{amount} рублей = {result} {currency}")
+        bot.send_message(call.message.chat.id, f"{amount} рублей = {result} {currency}")
+    except Exception as e:
+        bot.send_message(call.message.chat.id, "Произошла ошибка: {}".format(str(e)))
+
+
+
 
 
 @bot.message_handler(commands=['weather'])
@@ -117,28 +136,11 @@ def get_weather(message):
         bot.reply_to(message, 'Не удалось получить данные о погоде для данного города')
 
 
-@bot.message_handler(commands=['help'])
+@bot.message_handler(commands=['id'])
     #message будет хранить в себе информацию про пользователя и чат
-def main(message):
+def id(message):
     #ответ на команду #help, третим аргументом передается параметр для форматирования строки в теги html
-    bot.send_message(message.chat.id, '<b>help</b> <em>information</em>',parse_mode='html')
-
-
-#декоратор для обработки прямых сообщений пользователя
-@bot.message_handler()
-#message будет хранить в себе информацию про пользователя и чат
-def info(message):
-    #получаем информацию, что именно пользователь прислал и приводим к нижнему регистру
-    if message.text.lower() == 'привет':
-        if message.from_user.first_name and message.from_user.last_name: # если у пользователя есть имя и фамилия, то выводим
-            bot.send_message(message.chat.id, f'Привет, {message.from_user.first_name} {message.from_user.last_name}!')
-        elif message.from_user.first_name: #если у пользователя нет фамилии, то выводим только имя
-            bot.send_message(message.chat.id, f'Привет, {message.from_user.first_name}!')
-    elif message.text.lower() == 'id':
-            #ответ на предыдущее сообщение
-        bot.reply_to(message, f'ID: {message.from_user.id}')
-
-
+    bot.reply_to(message, f'ID: {message.from_user.id}')
 
 
 bot.polling(none_stop=True)
