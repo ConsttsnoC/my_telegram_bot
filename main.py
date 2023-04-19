@@ -71,49 +71,54 @@ def site(message):
 
 @bot.message_handler(commands=['converter'])
 def converter(message):
-    bot.send_message(message.chat.id, 'Введите сумму')
-    bot.register_next_step_handler(message, summa)
+    # Создаем клавиатуру для выбора первой валюты
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    markup.add(types.KeyboardButton('RUB'), types.KeyboardButton('USD'), types.KeyboardButton('EUR'),types.KeyboardButton('TRY'))
+    bot.send_message(message.chat.id, "Выберите первую валюту, из которой будет произодиться конвертация", reply_markup=markup)
+    bot.register_next_step_handler(message, select_first_currency)
 
-def summa(message):
-    global amount
+def select_first_currency(message):
     try:
-        amount = int(message.text.strip())
+        # Получаем выбранную первую валюту и создаем клавиатуру для выбора второй валюты
+        first_currency = message.text.strip().upper()
+        markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+        markup.add(types.KeyboardButton('RUB'), types.KeyboardButton('USD'), types.KeyboardButton('EUR'),types.KeyboardButton('TRY'))
+        bot.send_message(message.chat.id, f"Выберите вторую валюту для конвертации из {first_currency}", reply_markup=markup)
 
-        if amount <= 0:
-            raise ValueError("Сумма должна быть положительным числом")
+        # Сохраняем выбранную первую валюту в глобальной переменной
+        global currency_from
+        currency_from = first_currency
 
-        bot.send_message(message.chat.id, f"Вы указали сумму {amount} рублей. Теперь выберите пару валют:")
+        bot.register_next_step_handler(message, select_second_currency)
 
-        mark = types.InlineKeyboardMarkup(row_width=2)
-        btn1 = types.InlineKeyboardButton('RUB/TL', callback_data='TRY')
-        btn2 = types.InlineKeyboardButton('RUB/USD', callback_data='USD')
-        btn3 = types.InlineKeyboardButton('RUB/EUR', callback_data='EUR')
-
-        mark.add(btn1,btn2,btn3)
-        bot.send_message(message.chat.id, 'Выберите пару валют', reply_markup=mark)
-
-    except ValueError:
-        bot.send_message(message.chat.id, "Ошибка: введенное значение не является положительным числом.")
     except Exception as e:
         bot.send_message(message.chat.id, "Произошла ошибка: {}".format(str(e)))
 
-
-
-@bot.callback_query_handler(func=lambda call: True)
-def callback_handler(call):
+def select_second_currency(message):
     try:
-        # получаем значение валюты из callback_data
-        currency = call.data
+        # Получаем выбранную вторую валюту, создаем клавиатуру для ввода суммы и сохраняем выбранную вторую валюту
+        second_currency = message.text.strip().upper()
+        markup = types.ReplyKeyboardRemove()
+        bot.send_message(message.chat.id, f"Выбрана пара валют {currency_from}/{second_currency}. Введите сумму для конвертации", reply_markup=markup)
+        global currency_to
+        currency_to = second_currency
+        bot.register_next_step_handler(message, convert)
 
-        api_url = f"https://api.apilayer.com/exchangerates_data/convert?from=RUB&to={currency}&amount={amount}&apikey={api}"
+    except Exception as e:
+        bot.send_message(message.chat.id, "Произошла ошибка: {}".format(str(e)))
+
+def convert(message):
+    try:
+        # Получаем введенную сумму, отправляем запрос к API и отправляем результат пользователю
+        amount = float(message.text.strip())
+        api_url = f"https://api.apilayer.com/exchangerates_data/convert?from={currency_from}&to={currency_to}&amount={amount}&apikey={api}"
         response = requests.get(api_url)
         result = response.json()['result']
-        bot.answer_callback_query(callback_query_id=call.id, text=f"{amount} рублей = {result} {currency}")
-        bot.send_message(call.message.chat.id, f"{amount} рублей = {result} {currency}")
+        bot.send_message(message.chat.id, f"{amount} {currency_from} = {result} {currency_to}")
+    except ValueError:
+        bot.send_message(message.chat.id, "Ошибка: введенное значение не является числом.")
     except Exception as e:
-        bot.send_message(call.message.chat.id, "Произошла ошибка: {}".format(str(e)))
-
-
+        bot.send_message(message.chat.id, "Произошла ошибка: {}".format(str(e)))
 
 
 
