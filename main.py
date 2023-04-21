@@ -1,6 +1,8 @@
 #модуль для открытия вебэстраницы
 import webbrowser
 import sqlite3
+
+import openai
 import telebot
 import config
 import requests
@@ -13,6 +15,7 @@ amount = 0
 bot = telebot.TeleBot(config.TOKEN)
 opi = config.OPI
 api = config.API_KEY
+openai.api_key = config.openai.api_key
 
 
 #декоратор для команды start
@@ -147,5 +150,26 @@ def id(message):
     #ответ на команду #help, третим аргументом передается параметр для форматирования строки в теги html
     bot.reply_to(message, f'ID: {message.from_user.id}')
 
+# Обработчик команды /start_chatting, который отправляет приветственное сообщение
+@bot.message_handler(commands=['start_chatting'])
+#Функция start_chatting запускается, когда пользователь отправляет
+def start_chatting(message):
+    # Отправляем приветственное сообщение
+    bot.send_message(message.chat.id, "Привет! Я ИИ-ассистент, готов общаться с вами. Что вы хотите спросить?")
+# Функция, использующая API OpenAI для генерации ответа на входящее сообщение
+def generate_openai_response(input_text):
+    # Создание запроса к API OpenAI с использованием заданных параметров
+    response = openai.Completion.create(
+        engine="text-davinci-002", # Задаем используемую модель для обработки естественного языка
+        prompt=f"{input_text} Ответьте на русском языке.",# Указываем начальный текст для запроса и требуем, чтобы ответ был на русском языке
+        max_tokens=500,# Указываем максимальное количество токенов, которые могут быть сгенерированы
+        n=1,# Указываем количество вариантов ответа, которые должны быть сгенерированы
+        stop=None,# Указываем, что не требуется остановка генерации в определенном месте
+        temperature=0.5,# Указываем температуру, которая контролирует вероятность выбора наиболее вероятного следующего токена
+    )
+    # Извлечение сгенерированного ответа из ответа API OpenAI
+    message = response.choices[0].text.strip()
+    # Возврат сгенерированного текста ответа
+    return message
 
 bot.polling(none_stop=True)
