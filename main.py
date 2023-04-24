@@ -26,8 +26,7 @@ def start(message):
     conn = sqlite3.connect('peopl.sql')
     cur = conn.cursor()
     # создаем таблицу users в бд
-    cur.execute(
-        'CREATE TABLE IF NOT EXISTS users (id int auto_increment primary key, name varchar(50), pass varchar(50))')
+    cur.execute('CREATE TABLE IF NOT EXISTS users (id int auto_increment primary key, name varchar(50), pass varchar(50))')
     user(message)  # добавить данные пользователя в базу данных
     conn.commit()
     cur.close()
@@ -46,8 +45,7 @@ def user(message):
     cur.execute("SELECT COUNT(*) FROM users WHERE pass = ?", (message.from_user.id,))
     count = cur.fetchone()[0]
     if count == 0:
-        cur.execute("INSERT INTO users (name, pass) VALUES (?, ?)",
-                    (message.from_user.first_name, message.from_user.id))
+        cur.execute("INSERT INTO users (name, pass) VALUES (?, ?)",(message.from_user.first_name, message.from_user.id))
         conn.commit()
     cur.close()
     conn.close()
@@ -244,8 +242,7 @@ def add_word(message):
     cur = conn.cursor()
 
     # Создаем таблицу слов для каждого пользователя, если она не существует
-    cur.execute(
-        "CREATE TABLE IF NOT EXISTS words (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, word_number INTEGER, english_word TEXT, russian_word TEXT)")
+    cur.execute("CREATE TABLE IF NOT EXISTS words (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, word_number INTEGER, english_word TEXT, russian_word TEXT)")
 
     # Запрашиваем у пользователя слово на английском языке
     user_id = message.chat.id
@@ -331,8 +328,7 @@ def add_russian_word(message, english_word):
     user_id = message.chat.id
 
     # Обновляем русский перевод для данного английского слова
-    cur.execute("UPDATE words SET russian_word = ? WHERE user_id = ? AND english_word = ?",
-                (russian_word, user_id, english_word))
+    cur.execute("UPDATE words SET russian_word = ? WHERE user_id = ? AND english_word = ?",(russian_word, user_id, english_word))
 
     # Сохраняем изменения и закрываем соединение с базой данных
     conn.commit()
