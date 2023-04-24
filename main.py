@@ -81,31 +81,37 @@ def site(message):
     webbrowser.open('https://www.gilmanov.net/')
 
 
+# Обработчик команды "converter"
 @bot.message_handler(commands=['converter'])
 def converter(message):
     # Создаем клавиатуру для выбора первой валюты
-    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True) # создание объекта клавиатуры с 2 столбцами
     markup.add(types.KeyboardButton('RUB'), types.KeyboardButton('USD'), types.KeyboardButton('EUR'),
-               types.KeyboardButton('TRY'))
+               types.KeyboardButton('TRY')) # добавление кнопок на клавиатуру
     bot.send_message(message.chat.id, "Выберите первую валюту, из которой будет произодиться конвертация",
-                     reply_markup=markup)
-    bot.register_next_step_handler(message, select_first_currency)
+                     reply_markup=markup) # отправка сообщения и клавиатуры пользователю
+    bot.register_next_step_handler(message, select_first_currency) # регистрация следующего шага, функции select_first_currency
+
 
 
 def select_first_currency(message):
     try:
-        # Получаем выбранную первую валюту и создаем клавиатуру для выбора второй валюты
+        # Получаем выбранную первую валюту из текста сообщения и создаем клавиатуру выбора второй валюты
         first_currency = message.text.strip().upper()
-        markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+        markup = types.ReplyKeyboardMarkup(row_width=2,
+                                           resize_keyboard=True)  # создаем клавиатуру с двумя кнопками в строке и возможностью изменения размера
         markup.add(types.KeyboardButton('RUB'), types.KeyboardButton('USD'), types.KeyboardButton('EUR'),
+                   # добавляем кнопки выбора валют
                    types.KeyboardButton('TRY'))
         bot.send_message(message.chat.id, f"Выберите вторую валюту для конвертации из {first_currency}",
+                         # отправляем сообщение с просьбой выбрать вторую валюту
                          reply_markup=markup)
 
         # Сохраняем выбранную первую валюту в глобальной переменной
         global currency_from
         currency_from = first_currency
 
+        # Регистрируем обработчик следующего шага (выбора второй валюты)
         bot.register_next_step_handler(message, select_second_currency)
 
     except Exception as e:
@@ -114,16 +120,25 @@ def select_first_currency(message):
 
 def select_second_currency(message):
     try:
-        # Получаем выбранную вторую валюту, создаем клавиатуру для ввода суммы и сохраняем выбранную вторую валюту
+        # Получаем выбранную вторую валюту из текста сообщения, удаляем пробелы и делаем буквы заглавными
         second_currency = message.text.strip().upper()
+
+        # Создаем клавиатуру для ввода суммы и убираем клавиатуру выбора валют
         markup = types.ReplyKeyboardRemove()
+
+        # Отправляем сообщение с выбранной парой валют и просим пользователя ввести сумму для конвертации
         bot.send_message(message.chat.id,
                          f"Выбрана пара валют {currency_from}/{second_currency}. Введите сумму для конвертации",
                          reply_markup=markup)
+
+        # Сохраняем выбранную вторую валюту в глобальной переменной
         global currency_to
         currency_to = second_currency
+
+        # Регистрируем обработчик следующего шага (ввода суммы для конвертации) с помощью функции "convert"
         bot.register_next_step_handler(message, convert)
 
+    # Если возникла ошибка, отправляем сообщение с текстом ошибки
     except Exception as e:
         bot.send_message(message.chat.id, "Произошла ошибка: {}".format(str(e)))
 
