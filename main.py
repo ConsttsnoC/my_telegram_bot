@@ -172,4 +172,148 @@ def generate_openai_response(input_text):
     # Возврат сгенерированного текста ответа
     return message
 
+
+
+@bot.message_handler(commands=['add_word'])
+def add_word(message):
+    # Подключаемся к базе данных
+    conn = sqlite3.connect('peopl.sql')
+    cur = conn.cursor()
+
+    # Создаем таблицу пользователей, если она не существует
+    cur.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY)")
+
+    # Проверяем, существует ли столбец user_id в таблице пользователей
+    cur.execute("PRAGMA table_info(users)")
+    columns = [column[1] for column in cur.fetchall()]
+    if "user_id" not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN user_id INTEGER")
+
+    # Создаем таблицу слов для каждого пользователя, если она не существует
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS words (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, word_number INTEGER, english_word TEXT, russian_word TEXT)")
+    conn.commit()
+
+    # Записываем информацию о пользователе, если он еще не добавлен в базу
+    user_id = message.chat.id
+    cur.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
+    conn.commit()
+
+    cur.close()
+    conn.close()
+
+    # Запрашиваем у пользователя слово на английском языке
+    bot.send_message(user_id, "Введите слово на английском языке:")
+    bot.register_next_step_handler(message, add_english_word)
+
+
+def add_english_word(message):
+    english_word = message.text
+
+    # Сохраняем слово на английском языке и запрашиваем перевод на русский язык
+    conn = sqlite3.connect('peopl.sql')
+    cur = conn.cursor()
+    user_id = message.chat.id
+
+    # Определяем порядковый номер слова пользователя
+    cur.execute("SELECT MAX(word_number) FROM words WHERE user_id = ?", (user_id,))
+    max_word_number = cur.fetchone()[0]
+    word_number = 1 if max_word_number is None else max_word_number + 1
+
+    # Добавляем слово в таблицу words
+    cur.execute("INSERT INTO words (user_id, word_number, english_word, russian_word) VALUES (?, ?, ?, ?)", (user_id, word_number, english_word, ""))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    bot.send_message(user_id, f"Введите перевод слова '{english_word}' на русский язык:")
+    bot.register_next_step_handler(message, add_russian_word, english_word)
+
+
+def add_english_word(message):
+    english_word = message.text
+
+    # Сохраняем слово на английском языке и запрашиваем перевод на русский язык
+    conn = sqlite3.connect('peopl.sql')
+    cur = conn.cursor()
+    user_id = message.chat.id
+    cur.execute("INSERT INTO words (user_id, english_word, russian_word) VALUES (?, ?, ?)", (user_id, english_word, ""))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    bot.send_message(user_id, f"Введите перевод слова '{english_word}' на русский язык:")
+    bot.register_next_step_handler(message, add_russian_word, english_word)
+
+
+def add_russian_word(message, english_word):
+    if not english_word:
+        bot.send_message(message.chat.id, "Для добавления перевода сначала используйте команду /add_word")
+        return
+
+    russian_word = message.text
+
+    conn = sqlite3.connect('peopl.sql')
+    cur = conn.cursor()
+    user_id = message.chat.id
+    cur.execute("UPDATE words SET russian_word = ? WHERE user_id = ? AND english_word = ?", (russian_word, user_id, english_word))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    bot.send_message(user_id, f"Слово '{english_word}' успешно добавлено с переводом '{russian_word}'!")
+
+
+@bot.message_handler(commands=['get_words'])
+def get_words(message):
+    conn = sqlite3.connect('peopl.sql')
+    cur = conn.cursor()
+    user_id = message.chat.id
+    cur.execute("SELECT english_word, russian_word FROM words WHERE user_id = ?", (user_id,))
+    rows = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    words_list = ""
+    for i, row in enumerate(rows, 1):
+        words_list += f"{i}. {row[0]} - {row[1]}\n"
+
+    if words_list:
+        bot.send_message(user_id, words_list)
+    else:
+        bot.send_message(user_id, "Список слов пуст")
+
+@bot.message_handler(commands=['delete_word'])
+def delete_word(message):
+    # Подключаемся к базе данных
+    conn = sqlite3.connect('peopl.sql')
+    cur = conn.cursor()
+
+    # Запрашиваем у пользователя слово на русском языке, которое нужно удалить
+    user_id = message.chat.id
+    bot.send_message(user_id, "Введите слово на русском языке, которое нужно удалить:")
+    bot.register_next_step_handler(message, delete_word_by_russian, conn, cur, user_id)
+
+
+@bot.message_handler(commands=['delete_word_by_russian'])
+def delete_word_by_russian(message):
+    user_id = message.chat.id
+    bot.send_message(user_id, "Введите слово на русском, которое хотите удалить:")
+
+    # Обновляем состояние пользователя на "ожидание ввода слова"
+    bot.register_next_step_handler(message, delete_word_by_russian_step2)
+
+def delete_word_by_russian_step2(message):
+    user_id = message.chat.id
+    russian_word = message.text.strip()
+    conn = sqlite3.connect('peopl.sql')
+    cur = conn.cursor()
+    cur.execute("DELETE FROM words WHERE user_id = ? AND russian_word = ?", (user_id, russian_word))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    bot.send_message(user_id, f"Слово '{russian_word}' удалено из словаря.")
+
 bot.polling(none_stop=True)
