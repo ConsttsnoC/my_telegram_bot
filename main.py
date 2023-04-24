@@ -1,6 +1,7 @@
 #модуль для открытия вебэстраницы
 import webbrowser
 import sqlite3
+
 import openai
 import telebot
 import config
@@ -12,11 +13,8 @@ from telebot import types
 amount = 0
 #Api для подключения бота
 bot = telebot.TeleBot(config.TOKEN)
-#Api для погоды
 opi = config.OPI
-#Apt для конвертации валют
 api = config.API_KEY
-#Api для GPTchat OpenAI
 openai.api_key = config.openai.api_key
 
 
@@ -176,37 +174,24 @@ def generate_openai_response(input_text):
 
 
 
+# Обработчик команды /add_word
 @bot.message_handler(commands=['add_word'])
 def add_word(message):
     # Подключаемся к базе данных
     conn = sqlite3.connect('peopl.sql')
     cur = conn.cursor()
 
-    # Создаем таблицу пользователей, если она не существует
-    cur.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY)")
-
-    # Проверяем, существует ли столбец user_id в таблице пользователей
-    cur.execute("PRAGMA table_info(users)")
-    columns = [column[1] for column in cur.fetchall()]
-    if "user_id" not in columns:
-        cur.execute("ALTER TABLE users ADD COLUMN user_id INTEGER")
-
     # Создаем таблицу слов для каждого пользователя, если она не существует
     cur.execute(
         "CREATE TABLE IF NOT EXISTS words (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, word_number INTEGER, english_word TEXT, russian_word TEXT)")
-    conn.commit()
 
-    # Записываем информацию о пользователе, если он еще не добавлен в базу
+    # Запрашиваем у пользователя слово на английском языке
     user_id = message.chat.id
-    cur.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
-    conn.commit()
+    bot.send_message(user_id, "Введите слово на английском языке:")
+    bot.register_next_step_handler(message, add_english_word)
 
     cur.close()
     conn.close()
-
-    # Запрашиваем у пользователя слово на английском языке
-    bot.send_message(user_id, "Введите слово на английском языке:")
-    bot.register_next_step_handler(message, add_english_word)
 
 
 def add_english_word(message):
