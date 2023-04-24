@@ -1,7 +1,6 @@
 #модуль для открытия вебэстраницы
 import webbrowser
 import sqlite3
-
 import openai
 import telebot
 import config
@@ -13,8 +12,11 @@ from telebot import types
 amount = 0
 #Api для подключения бота
 bot = telebot.TeleBot(config.TOKEN)
+#Api для погоды
 opi = config.OPI
+#Apt для конвертации валют
 api = config.API_KEY
+#Api для GPTchat OpenAI
 openai.api_key = config.openai.api_key
 
 
