@@ -1,6 +1,5 @@
-# модуль для открытия вебэстраницы
+# модуль для открытия веб-страницы
 import webbrowser
-import sqlite3
 import openai
 import telebot
 import config
@@ -32,14 +31,14 @@ def start(message):
     conn.commit()
     cur.close()
     conn.close()
-    # выводим приветсвенное сообщение пользователю, либо имя, любо имя и фамлия
+    # выводим приветственное сообщение пользователю, либо имя, любо имя и фамилия
     if message.from_user.first_name and message.from_user.last_name:
         bot.send_message(message.chat.id, f'Привет, {message.from_user.first_name} {message.from_user.last_name}!')
     elif message.from_user.first_name:
         bot.send_message(message.chat.id, f'Привет, {message.from_user.first_name}!')
 
 
-# проеряем что пользователя нет в бд, и добавляем, а если есть, то не добавляем
+# проверяем что пользователя нет в бд, и добавляем, а если есть, то не добавляем
 def user(message):
     conn = sqlite3.connect(db)
     cur = conn.cursor()
@@ -52,7 +51,7 @@ def user(message):
     conn.close()
 
 
-# обработчик комманды users, выдает сообщением список всех пользователей записанных в бд
+# обработчик команды users, выдает сообщением список всех пользователей записанных в бд
 @bot.message_handler(commands=['users'])
 def get_users(message):
     conn = sqlite3.connect(db)
@@ -70,13 +69,13 @@ def get_users(message):
 
 # обработчик команды перехода на github
 @bot.message_handler(commands=['github'])
-def github(message):
+def github():
     webbrowser.open('https://github.com/ConsttsnoC?tab=repositories')
 
 
 # обработчик команды перехода на site
 @bot.message_handler(commands=['site'])
-def site(message):
+def site():
     webbrowser.open('https://www.gilmanov.net/')
 
 
@@ -87,7 +86,7 @@ def converter(message):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True) # создание объекта клавиатуры с 2 столбцами
     markup.add(types.KeyboardButton('RUB'), types.KeyboardButton('USD'), types.KeyboardButton('EUR'),
                types.KeyboardButton('TRY')) # добавление кнопок на клавиатуру
-    bot.send_message(message.chat.id, "Выберите первую валюту, из которой будет произодиться конвертация",
+    bot.send_message(message.chat.id, "Выберите первую валюту, из которой будет производиться конвертация",
                      reply_markup=markup) # отправка сообщения и клавиатуры пользователю
     bot.register_next_step_handler(message, select_first_currency) # регистрация следующего шага, функции select_first_currency
 
@@ -185,7 +184,7 @@ def get_weather(message):
     if res.status_code == 200:
         # Если запрос успешен, преобразуем ответ в объект JSON
         data = json.loads(res.text)
-        # Извлекаем температуру и описание погоды из данных, полученных от API
+        # Извлекаем температуру и описание погоды из данных, полученных API
         temp = data['main']['temp']
         description = data['weather'][0]['description']
         # Переводим описание погоды на русский язык, используя словарь WEATHER_TRANSLATIONS
@@ -202,7 +201,7 @@ def get_weather(message):
 @bot.message_handler(commands=['id'])
 # message будет хранить в себе информацию про пользователя и чат
 def id(message):
-    # ответ на команду #help, третим аргументом передается параметр для форматирования строки в теги html
+    # ответ на команду #help, третьим аргументом передается параметр для форматирования строки в теги html
     bot.reply_to(message, f'ID: {message.from_user.id}')
 
 
@@ -238,7 +237,7 @@ def generate_openai_response(input_text):
 def add_word(message):
     # Подключаемся к базе данных
     conn =sqlite3.connect(db)
-    # создает объект-курсор, который используется для выполнения запросов к базе данных через соединение conn.
+    # Создает объект-курсор, который используется для выполнения запросов к базе данных через соединение conn.
     # Курсор позволяет перебирать результаты запроса, а также вставлять, обновлять и удалять данные в базе данных.
     cur = conn.cursor()
 
@@ -491,6 +490,9 @@ def add_russian_words_to_db(message, english_words):
 # Функция для разделения строки на отдельные элементы списка
 def split_text(text):
     return [s.strip() for s in text.split(',')]
+
+
+
 
 
 bot.polling(none_stop=True)
