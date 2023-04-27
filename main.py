@@ -1,7 +1,6 @@
 # модуль для открытия вебэстраницы
 import webbrowser
 import sqlite3
-
 import openai
 import telebot
 import config
@@ -10,12 +9,14 @@ import json
 from translations import WEATHER_TRANSLATIONS
 from telebot import types
 
+
 amount = 0
 # Api для подключения бота
 bot = telebot.TeleBot(config.TOKEN)
 opi = config.OPI
 api = config.API_KEY
 openai.api_key = config.openai.api_key
+db = config.DATABASE_NAME
 
 
 # декоратор для команды start
@@ -23,7 +24,7 @@ openai.api_key = config.openai.api_key
 # message будет хранить в себе информацию про пользователя и чат
 def start(message):
     # ответ на команду #start
-    conn = sqlite3.connect('peopl.sql')
+    conn = sqlite3.connect(db)
     cur = conn.cursor()
     # создаем таблицу users в бд
     cur.execute('CREATE TABLE IF NOT EXISTS users (id int auto_increment primary key, name varchar(50), pass varchar(50))')
@@ -40,7 +41,7 @@ def start(message):
 
 # проеряем что пользователя нет в бд, и добавляем, а если есть, то не добавляем
 def user(message):
-    conn = sqlite3.connect('peopl.sql')
+    conn = sqlite3.connect(db)
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM users WHERE pass = ?", (message.from_user.id,))
     count = cur.fetchone()[0]
@@ -54,7 +55,7 @@ def user(message):
 # обработчик комманды users, выдает сообщением список всех пользователей записанных в бд
 @bot.message_handler(commands=['users'])
 def get_users(message):
-    conn = sqlite3.connect('peopl.sql')
+    conn = sqlite3.connect(db)
     cur = conn.cursor()
     cur.execute("SELECT name, pass FROM users")
     rows = cur.fetchall()
@@ -236,7 +237,7 @@ def generate_openai_response(input_text):
 @bot.message_handler(commands=['add_word'])
 def add_word(message):
     # Подключаемся к базе данных
-    conn = sqlite3.connect('peopl.sql')
+    conn =sqlite3.connect(db)
     # создает объект-курсор, который используется для выполнения запросов к базе данных через соединение conn.
     # Курсор позволяет перебирать результаты запроса, а также вставлять, обновлять и удалять данные в базе данных.
     cur = conn.cursor()
@@ -259,7 +260,7 @@ def add_english_word(message):
     english_word = message.text  # сохраняем введенное пользователем слово на английском языке
 
     # Сохраняем слово на английском языке и запрашиваем перевод на русский язык
-    conn = sqlite3.connect('peopl.sql')  # подключаемся к базе данных
+    conn = sqlite3.connect(db)  # подключаемся к базе данных
     cur = conn.cursor()  # создаем курсор для работы с базой данных
     user_id = message.chat.id  # определяем идентификатор пользователя
 
@@ -286,7 +287,7 @@ def add_english_word(message):
     english_word = message.text
 
     # Устанавливаем соединение с базой данных SQLite и создаем объект-курсор для выполнения SQL-запросов
-    conn = sqlite3.connect('peopl.sql')
+    conn = sqlite3.connect(db)
     cur = conn.cursor()  # создаем объект-курсор для выполнения SQL-запросов
 
     # Получаем идентификатор чата пользователя
@@ -321,7 +322,7 @@ def add_russian_word(message, english_word):
     russian_word = message.text
 
     # Устанавливаем соединение с базой данных и создаем объект-курсор
-    conn = sqlite3.connect('peopl.sql')
+    conn = sqlite3.connect(db)
     cur = conn.cursor()
 
     # Получаем идентификатор пользователя
@@ -342,13 +343,28 @@ def add_russian_word(message, english_word):
 # Импортируем модуль для работы с базой данных SQLite
 import sqlite3
 
+def split_long_message(text, max_length=4096):
+    """
+    Разбивает текст на несколько сообщений, если одно сообщение слишком длинное
+    """
+    if len(text) <= max_length:
+        return [text]
+    else:
+        parts = []
+        current_part = ""
+        for line in text.split('\n'):
+            if len(current_part + line) + 1 > max_length:
+                parts.append(current_part)
+                current_part = ""
+            current_part += line + '\n'
+        if current_part:
+            parts.append(current_part)
+        return parts
 
-# Определяем функцию обработчика сообщений бота
-# Декоратор `commands=['get_words']` указывает на то, что функция будет обрабатывать сообщения, начинающиеся с команды '/get_words'
 @bot.message_handler(commands=['get_words'])
 def get_words(message):
-    # Устанавливаем соединение с базой данных 'peopl.sql' (если её нет, то она будет создана)
-    conn = sqlite3.connect('peopl.sql')
+    # Устанавливаем соединение с базой данных (если её нет, то она будет создана)
+    conn = sqlite3.connect(db)
     # Создаем курсор, с помощью которого будем выполнять запросы к базе данных
     cur = conn.cursor()
 
@@ -375,7 +391,10 @@ def get_words(message):
 
     # Отправляем список слов пользователю
     if words_list:
-        bot.send_message(user_id, words_list)
+        # Разбиваем список на части, если одно сообщение слишком длинное
+        words_parts = split_long_message(words_list)
+        for part in words_parts:
+            bot.send_message(user_id, part)
     else:
         bot.send_message(user_id, "Список слов пуст")
 
@@ -406,7 +425,7 @@ def delete_word_by_russian_step1(message):
         return
 
     # Подключаемся к базе данных и удаляем слово
-    conn = sqlite3.connect('peopl.sql')
+    conn = sqlite3.connect(db)
     cur = conn.cursor()
     cur.execute("DELETE FROM words WHERE user_id = ? AND russian_word = ?", (message.chat.id, russian_word))
     conn.commit()
@@ -415,6 +434,63 @@ def delete_word_by_russian_step1(message):
 
     # Отправляем пользователю подтверждение удаления слова
     bot.send_message(message.chat.id, f"Слово '{russian_word}' удалено из словаря.")
+
+
+# Обработчик команды /add_words
+@bot.message_handler(commands=['add_words'])
+def add_word(message):
+    # Запрашиваем у пользователя слова на английском языке
+    bot.send_message(message.chat.id, "Введите слова на английском языке, разделенные запятыми:")
+
+    # Регистрируем следующий шаг - обработчик add_english_words
+    bot.register_next_step_handler(message, add_words_to_db)
+
+
+# Обработчик списка слов на английском языке
+def add_words_to_db(message):
+    # Подключаемся к базе данных
+    conn = sqlite3.connect(db)
+    # Создаем объект-курсор
+    cur = conn.cursor()
+
+    # Разделяем список слов на отдельные элементы
+    english_words = split_text(message.text)
+
+    # Запрашиваем у пользователя соответствующие слова на русском языке
+    bot.send_message(message.chat.id, "Введите перевод слов на русский язык, разделенные запятыми:")
+    bot.register_next_step_handler(message, lambda m: add_russian_words_to_db(m, english_words))
+
+    cur.close()
+    conn.close()
+
+
+# Обработчик списка слов на русском языке
+def add_russian_words_to_db(message, english_words):
+    # Подключаемся к базе данных
+    conn = sqlite3.connect(db)
+    # Создаем объект-курсор
+    cur = conn.cursor()
+
+    # Разделяем список переводов на отдельные элементы
+    russian_words = split_text(message.text)
+
+    # Добавляем слова в базу данных
+    user_id = message.chat.id
+    for i in range(len(english_words)):
+        cur.execute("INSERT INTO words (user_id, word_number, english_word, russian_word) VALUES (?, ?, ?, ?)",
+                    (user_id, i + 1, english_words[i], russian_words[i]))
+        conn.commit()
+
+    # Отправляем сообщение пользователю об успешном добавлении слов
+    bot.send_message(user_id, f"Слова '{', '.join(english_words)}' успешно добавлены в базу данных.")
+
+    cur.close()
+    conn.close()
+
+
+# Функция для разделения строки на отдельные элементы списка
+def split_text(text):
+    return [s.strip() for s in text.split(',')]
 
 
 bot.polling(none_stop=True)
