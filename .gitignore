@@ -9,7 +9,7 @@ telenv/
 *.pyd
 *.pyc
 config.py
-myproject/peopl.sql
+peopl.sql
 # Distribution / packaging
 *.egg-info/
 dist/
